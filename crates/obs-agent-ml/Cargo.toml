@@ -1,0 +1,25 @@
+[package]
+name = "obs-agent-ml"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+# Core
+obs-agent-core = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+
+# ML
+smartcore = { workspace = true }
+
+# Serialización
+serde = { workspace = true }
+
+# Error Handling
+anyhow = { workspace = true }
+
+# Logging
+tracing = { workspace = true }

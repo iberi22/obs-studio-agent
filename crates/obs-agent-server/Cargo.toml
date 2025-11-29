@@ -1,0 +1,29 @@
+[package]
+name = "obs-agent-server"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+# Core
+obs-agent-core = { workspace = true }
+obs-agent-infra = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+
+# Web Framework
+actix-web = { workspace = true }
+actix-cors = { workspace = true }
+
+# Error Handling
+anyhow = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Serialización
+serde = { workspace = true }
+serde_json = { workspace = true }

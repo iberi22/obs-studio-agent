@@ -1,0 +1,54 @@
+[package]
+name = "obs-agent-infra"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+# Core
+obs-agent-core = { workspace = true }
+
+# OBS WebSocket
+obws = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+
+# Monitoreo
+sysinfo = { workspace = true }
+nvml-wrapper = { workspace = true, optional = true }
+
+# HTTP
+reqwest = { workspace = true }
+base64 = "0.21"
+
+# Python Bridge (disabled temporalmente - requiere Python <= 3.12)
+# pyo3 = { workspace = true }
+
+# Serialización
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Database
+sqlx = { workspace = true }
+
+# Error Handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Image
+image = { workspace = true }
+
+# Utilities
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+[features]
+default = []
+nvidia = ["nvml-wrapper"]

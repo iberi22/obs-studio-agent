@@ -5,6 +5,7 @@
 !/.github
 !/build-aux
 !/cmake
+!/crates
 !/deps
 !/docs
 !/frontend

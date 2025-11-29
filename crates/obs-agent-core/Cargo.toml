@@ -1,0 +1,34 @@
+[package]
+name = "obs-agent-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+# Async
+tokio = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+
+# Paralelización
+rayon = { workspace = true }
+
+# Serialización
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error Handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Utilities
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockall = "0.12"
