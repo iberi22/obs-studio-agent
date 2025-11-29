@@ -1,5 +1,6 @@
 mod config;
 mod ui;
+mod obs_launcher;
 
 use anyhow::Result;
 use eframe::egui;
@@ -9,6 +10,15 @@ fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter("obs_agent_gui=debug,obs_agent_core=info,obs_agent_infra=info")
         .init();
+
+    // Auto-launch OBS si no está corriendo
+    match obs_launcher::ensure_obs_running() {
+        Ok(_) => println!("✅ OBS está listo"),
+        Err(e) => {
+            eprintln!("⚠️  Advertencia: {}", e);
+            eprintln!("💡 Por favor, inicia OBS Studio manualmente");
+        }
+    }
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
