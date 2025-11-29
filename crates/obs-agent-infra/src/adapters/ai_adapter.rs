@@ -8,6 +8,9 @@ use obs_agent_core::domain::models::{Anomaly, HardwareInfo, VideoSettings};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use tokio::time::{Duration, Instant};
 use tracing::{debug, info};
 
 /// Adapter para interactuar con Google Gemini API
@@ -15,6 +18,8 @@ pub struct AIAdapter {
     api_key: String,
     model: String,
     client: Client,
+    last_request: Arc<Mutex<Instant>>,
+    rate_limit: Duration,
 }
 
 #[derive(Debug, Serialize)]
@@ -74,8 +79,10 @@ impl AIAdapter {
     pub fn new(api_key: impl Into<String>) -> Self {
         Self {
             api_key: api_key.into(),
-            model: "gemini-1.5-pro".to_string(),
+            model: "gemini-pro".to_string(),
             client: Client::new(),
+            last_request: Arc::new(Mutex::new(Instant::now() - Duration::from_secs(60))), // Allow first request immediately
+            rate_limit: Duration::from_millis(1500), // Example: 1.5 seconds between requests
         }
     }
 
@@ -85,9 +92,10 @@ impl AIAdapter {
     }
 
     async fn generate_content(&self, prompt: &str) -> Result<String> {
+        self.enforce_rate_limit().await?;
         let url = format!(
-            "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
-            self.model, self.api_key
+            "https://generativelanguage.googleapis.com/v1/models/{}:generateContent",
+            self.model
         );
 
         let request = GeminiRequest {
@@ -96,15 +104,13 @@ impl AIAdapter {
                     text: prompt.to_string(),
                 }],
             }],
-            generation_config: Some(GenerationConfig {
-                temperature: Some(0.7),
-                max_output_tokens: Some(2048),
-            }),
+            generation_config: None,
         };
 
         let response = self
             .client
-            .post(&url)
+            .post(url)
+            .header("x-goog-api-key", &self.api_key)
             .json(&request)
             .send()
             .await
@@ -126,9 +132,9 @@ impl AIAdapter {
     }
 
     async fn analyze_image_with_prompt(&self, image: &[u8], prompt: &str) -> Result<String> {
+        self.enforce_rate_limit().await?;
         let url = format!(
-            "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
-            self.model, self.api_key
+            "https://generativelanguage.googleapis.com/v1/models/gemini-pro-vision:generateContent"
         );
 
         let base64_image = general_purpose::STANDARD.encode(image);
@@ -155,7 +161,8 @@ impl AIAdapter {
 
         let response = self
             .client
-            .post(&url)
+            .post(url)
+            .header("x-goog-api-key", &self.api_key)
             .json(&request)
             .send()
             .await
@@ -174,6 +181,19 @@ impl AIAdapter {
             .context("No response from Gemini")?;
 
         Ok(text)
+    }
+
+    async fn enforce_rate_limit(&self) -> Result<()> {
+        let mut last_request = self.last_request.lock().await;
+        let elapsed = last_request.elapsed();
+
+        if elapsed < self.rate_limit {
+            let sleep_duration = self.rate_limit - elapsed;
+            tokio::time::sleep(sleep_duration).await;
+        }
+
+        *last_request = Instant::now();
+        Ok(())
     }
 }
 
@@ -214,14 +234,9 @@ impl AIPort for AIAdapter {
         );
 
         let response = self.generate_content(&prompt).await?;
-
-        // Parse JSON response (simplificado - en producción usar serde)
-        Ok(ConfigAnalysis {
-            is_optimal: response.contains("\"is_optimal\": true"),
-            issues: vec![],
-            recommendations: vec![],
-            required_plugins: vec![],
-        })
+        let analysis: ConfigAnalysis =
+            serde_json::from_str(&response).context("Failed to parse AI response for config analysis")?;
+        Ok(analysis)
     }
 
     async fn suggest_fix(&self, anomaly: &Anomaly) -> Result<String> {
@@ -253,12 +268,9 @@ impl AIPort for AIAdapter {
                       Describe what you see in detail.";
 
         let response = self.analyze_image_with_prompt(image, prompt).await?;
-
-        Ok(ImageAnalysis {
-            description: response,
-            elements: vec![],
-            text_detected: None,
-        })
+        let analysis: ImageAnalysis =
+            serde_json::from_str(&response).context("Failed to parse AI response for image analysis")?;
+        Ok(analysis)
     }
 
     async fn optimize_settings(&self, hardware: &HardwareInfo) -> Result<OBSConfig> {
@@ -278,23 +290,10 @@ impl AIPort for AIAdapter {
             hardware.ram.total_gb
         );
 
-        let _response = self.generate_content(&prompt).await?;
-
-        // Simplificado - en producción parsear el JSON
-        Ok(OBSConfig {
-            video: VideoSettings {
-                base_width: hardware.recommended_resolution.0,
-                base_height: hardware.recommended_resolution.1,
-                output_width: hardware.recommended_resolution.0,
-                output_height: hardware.recommended_resolution.1,
-                fps_numerator: hardware.recommended_fps,
-                fps_denominator: 1,
-            },
-            encoder: format!("{:?}", hardware.recommended_encoder),
-            preset: hardware.recommended_preset.clone(),
-            bitrate: hardware.recommended_bitrate,
-            audio_settings: json!({}),
-        })
+        let response = self.generate_content(&prompt).await?;
+        let config: OBSConfig =
+            serde_json::from_str(&response).context("Failed to parse AI response for settings optimization")?;
+        Ok(config)
     }
 
     async fn generate_overlay_design(&self, prompt: &str) -> Result<OverlayDesign> {
@@ -312,14 +311,10 @@ impl AIPort for AIAdapter {
             prompt
         );
 
-        let _response = self.generate_content(&full_prompt).await?;
-
-        // Simplificado - en producción parsear el JSON
-        Ok(OverlayDesign {
-            colors: vec!["#FF0000".to_string(), "#00FF00".to_string()],
-            layout: "modern".to_string(),
-            elements: vec![],
-        })
+        let response = self.generate_content(&full_prompt).await?;
+        let design: OverlayDesign =
+            serde_json::from_str(&response).context("Failed to parse AI response for overlay design")?;
+        Ok(design)
     }
 
     async fn generate(&self, prompt: &str) -> Result<String> {

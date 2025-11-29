@@ -1,6 +1,7 @@
 use crate::domain::models::*;
 use anyhow::Result;
 use async_trait::async_trait;
+use serde::Deserialize;
 use serde_json::Value;
 
 /// Puerto para interactuar con sistemas de IA/LLM
@@ -26,7 +27,7 @@ pub trait AIPort: Send + Sync {
 }
 
 /// Análisis de configuración
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ConfigAnalysis {
     pub is_optimal: bool,
     pub issues: Vec<String>,
@@ -35,14 +36,14 @@ pub struct ConfigAnalysis {
 }
 
 /// Análisis de imagen
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ImageAnalysis {
     pub description: String,
     pub elements: Vec<UIElement>,
     pub text_detected: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct UIElement {
     pub element_type: String,
     pub label: String,
@@ -50,7 +51,7 @@ pub struct UIElement {
 }
 
 /// Configuración completa de OBS
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct OBSConfig {
     pub video: VideoSettings,
     pub encoder: String,
@@ -60,14 +61,14 @@ pub struct OBSConfig {
 }
 
 /// Diseño de overlay
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct OverlayDesign {
     pub colors: Vec<String>,
     pub layout: String,
     pub elements: Vec<DesignElement>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct DesignElement {
     pub element_type: String,
     pub position: (i32, i32),
@@ -76,7 +77,7 @@ pub struct DesignElement {
 }
 
 /// Información de plugin
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct PluginInfo {
     pub name: String,
     pub version: String,
