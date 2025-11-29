@@ -23,12 +23,12 @@ fn render_ai(&mut self, ui: &mut egui::Ui) {
             // Usuario autenticado
             ui.label(format!("📧 Email: {}", email));
             ui.label(format!("💎 Tier: {}", self.config.subscription_tier.display_name()));
-            ui.label(format!("⭐ Créditos disponibles: {}/{}", 
+            ui.label(format!("⭐ Créditos disponibles: {}/{}",
                 self.config.credits_available,
                 self.config.subscription_tier.credits_per_month()));
 
             // Barra de progreso de créditos
-            let progress = self.config.credits_available as f32 
+            let progress = self.config.credits_available as f32
                 / self.config.subscription_tier.credits_per_month() as f32;
             ui.add(egui::ProgressBar::new(progress).text("Créditos"));
 
@@ -49,7 +49,7 @@ fn render_ai(&mut self, ui: &mut egui::Ui) {
                 // Formulario de login
                 ui.label("📧 Email:");
                 ui.text_edit_singleline(&mut self.login_email);
-                
+
                 ui.label("🔑 Contraseña:");
                 ui.add(egui::TextEdit::singleline(&mut self.login_password).password(true));
 
@@ -71,10 +71,10 @@ fn render_ai(&mut self, ui: &mut egui::Ui) {
 
                 ui.label("📧 Email:");
                 ui.text_edit_singleline(&mut self.register_email);
-                
+
                 ui.label("🔑 Contraseña:");
                 ui.add(egui::TextEdit::singleline(&mut self.register_password).password(true));
-                
+
                 ui.label("🔑 Confirmar Contraseña:");
                 ui.add(egui::TextEdit::singleline(&mut self.register_confirm_password).password(true));
 
@@ -172,7 +172,7 @@ fn render_ai(&mut self, ui: &mut egui::Ui) {
                 }
             });
 
-            ui.label(format!("💰 Costo: 1 crédito por mensaje • Disponibles: {}", 
+            ui.label(format!("💰 Costo: 1 crédito por mensaje • Disponibles: {}",
                 self.config.credits_available));
         });
     } else {
@@ -182,12 +182,12 @@ fn render_ai(&mut self, ui: &mut egui::Ui) {
 
 fn render_tier_card(&mut self, ui: &mut egui::Ui, tier: crate::config::SubscriptionTier) {
     let is_current = self.config.subscription_tier == tier;
-    
+
     egui::Frame::none()
-        .fill(if is_current { 
-            egui::Color32::from_rgb(40, 60, 80) 
-        } else { 
-            egui::Color32::from_rgb(30, 30, 30) 
+        .fill(if is_current {
+            egui::Color32::from_rgb(40, 60, 80)
+        } else {
+            egui::Color32::from_rgb(30, 30, 30)
         })
         .stroke(if is_current {
             egui::Stroke::new(2.0, egui::Color32::from_rgb(0, 180, 255))
@@ -197,7 +197,7 @@ fn render_tier_card(&mut self, ui: &mut egui::Ui, tier: crate::config::Subscript
         .inner_margin(10.0)
         .show(ui, |ui| {
             ui.set_width(180.0);
-            
+
             ui.heading(tier.display_name());
             if is_current {
                 ui.label("✅ Plan Actual");
@@ -268,7 +268,7 @@ fn send_chat_message(&mut self) {
 
     // Simular respuesta de IA (aquí iría la integración real con Gemini)
     let response = self.get_ai_response(&user_message);
-    
+
     self.chat_messages.push(ChatMessage {
         role: MessageRole::Assistant,
         content: response,
@@ -276,7 +276,7 @@ fn send_chat_message(&mut self) {
     });
 
     self.ai_thinking = false;
-    
+
     // Guardar config actualizada
     let _ = self.config.save();
 }
@@ -297,10 +297,10 @@ fn handle_login(&mut self) {
     self.config.user_token = Some(format!("mock_token_{}", chrono::Local::now().timestamp()));
     self.config.subscription_tier = crate::config::SubscriptionTier::Free;
     self.config.credits_available = 100;
-    
+
     self.auth_message = Some("✅ Sesión iniciada correctamente".to_string());
     self.login_password.clear();
-    
+
     let _ = self.config.save();
 }
 
@@ -320,12 +320,12 @@ fn handle_register(&mut self) {
     self.config.user_token = Some(format!("mock_token_{}", chrono::Local::now().timestamp()));
     self.config.subscription_tier = crate::config::SubscriptionTier::Free;
     self.config.credits_available = 100;
-    
+
     self.auth_message = Some("✅ Cuenta creada exitosamente".to_string());
     self.show_register_form = false;
     self.register_password.clear();
     self.register_confirm_password.clear();
-    
+
     let _ = self.config.save();
 }
 
@@ -335,7 +335,7 @@ fn logout(&mut self) {
     self.config.subscription_tier = crate::config::SubscriptionTier::Free;
     self.config.credits_available = 0;
     self.chat_messages.clear();
-    
+
     let _ = self.config.save();
 }
 
@@ -343,13 +343,13 @@ fn upgrade_tier(&mut self, tier: crate::config::SubscriptionTier) {
     // Mock upgrade - en producción abriría página de pago
     self.config.subscription_tier = tier.clone();
     self.config.credits_available = tier.credits_per_month();
-    
+
     self.chat_messages.push(ChatMessage {
         role: MessageRole::System,
-        content: format!("✅ Plan actualizado a {}. Se han agregado {} créditos.", 
+        content: format!("✅ Plan actualizado a {}. Se han agregado {} créditos.",
             tier.display_name(), tier.credits_per_month()),
         timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
     });
-    
+
     let _ = self.config.save();
 }
