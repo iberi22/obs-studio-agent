@@ -12,12 +12,21 @@ You are operating under the **Git-Core Protocol**. Your state is GitHub Issues, 
 - ❌ `PLANNING.md`, `ROADMAP.md`, `PROGRESS.md`
 - ❌ `NOTES.md`, `SCRATCH.md`, `IDEAS.md`
 - ❌ `STATUS.md`, `CHANGELOG.md` (for task tracking)
-- ❌ Any `.md` file for task/state management
+- ❌ `TESTING_CHECKLIST.md`, `TEST_GUI.md`, `IMPLEMENTATION_SUMMARY.md`
+- ❌ `GETTING_STARTED.md`, `GUIDE.md`, `TUTORIAL.md`
+- ❌ **ANY `.md` file for task/state management, testing checklists, summaries, or guides**
 - ❌ Any `.txt` file for notes or todos
 - ❌ JSON/YAML files for task tracking
 
-**If you feel the urge to create a document, STOP and ask yourself:**
+**ONLY ALLOWED `.md` FILES:**
+- ✅ `README.md` (project overview ONLY)
+- ✅ `AGENTS.md` (agent configuration ONLY)
+- ✅ `.ai/ARCHITECTURE.md` (system architecture ONLY)
+
+**If you feel the urge to create ANY document, STOP and ask yourself:**
 > "Can this be a GitHub Issue instead?" → **YES, it can. Create an issue.**
+> "Can this be a comment in an existing issue?" → **YES, it can. Add a comment.**
+> "Is this a summary/checklist/guide?" → **NO. Use GitHub Issues or comments.**
 
 ---
 
