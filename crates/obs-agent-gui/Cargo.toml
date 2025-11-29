@@ -21,6 +21,9 @@ tokio = { workspace = true }
 eframe = "0.28"
 egui = "0.28"
 
+# Time
+chrono = "0.4"
+
 # Error Handling
 anyhow = { workspace = true }
 
@@ -35,4 +38,3 @@ toml = "0.8"
 
 # Utils
 dirs = "5.0"
-chrono = "0.4"

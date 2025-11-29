@@ -1,4 +1,4 @@
-use crate::config::PortableConfig;
+use crate::config::{PortableConfig, SubscriptionTier};
 use eframe::egui;
 use obs_agent_core::application::ports::{MonitorPort, OBSPort};
 use obs_agent_core::domain::services::{AnomalyDetector, HealthCheckService, SystemContext};
@@ -13,6 +13,21 @@ enum Tab {
     Hardware,
     Health,
     Anomalies,
+    AI,
+}
+
+#[derive(Debug, Clone)]
+struct ChatMessage {
+    role: MessageRole,
+    content: String,
+    timestamp: String,
+}
+
+#[derive(Debug, Clone)]
+enum MessageRole {
+    User,
+    Assistant,
+    System,
 }
 
 pub struct OBSAgentApp {
@@ -29,6 +44,24 @@ pub struct OBSAgentApp {
     // UI state
     show_config_saved: bool,
     error_message: Option<String>,
+
+    // AI Chat State
+    chat_messages: Vec<ChatMessage>,
+    chat_input: String,
+    ai_thinking: bool,
+
+    // Auth State
+    is_authenticated: bool,
+    user_email: String,
+    user_tier: SubscriptionTier,
+    ai_credits: u32,
+    login_email: String,
+    login_password: String,
+    register_email: String,
+    register_password: String,
+    register_confirm_password: String,
+    show_register_form: bool,
+    auth_message: Option<String>,
 }
 
 impl OBSAgentApp {
@@ -46,6 +79,20 @@ impl OBSAgentApp {
             anomalies: Vec::new(),
             show_config_saved: false,
             error_message: None,
+            chat_messages: Vec::new(),
+            chat_input: String::new(),
+            ai_thinking: false,
+            is_authenticated: false,
+            user_email: String::new(),
+            user_tier: SubscriptionTier::Free,
+            ai_credits: 0,
+            login_email: String::new(),
+            login_password: String::new(),
+            register_email: String::new(),
+            register_password: String::new(),
+            register_confirm_password: String::new(),
+            show_register_form: false,
+            auth_message: None,
         }
     }
 
@@ -252,6 +299,329 @@ impl OBSAgentApp {
         }
     }
 
+    // === AI & Subscription Functions ===
+    
+    fn render_ai(&mut self, ui: &mut egui::Ui) {
+        ui.heading("🤖 Asistente IA & Servicios Premium");
+        ui.add_space(10.0);
+
+        // Panel de estado de autenticación
+        ui.horizontal(|ui| {
+            if self.is_authenticated {
+                ui.label(format!("👤 Usuario: {}", self.user_email));
+                ui.label(format!("⭐ Plan: {:?}", self.user_tier));
+                ui.label(format!("💳 Créditos: {}", self.ai_credits));
+                
+                if ui.button("🚪 Cerrar Sesión").clicked() {
+                    self.logout();
+                }
+            } else {
+                ui.label("⚠️ No autenticado");
+                if ui.button("🔑 Iniciar Sesión").clicked() {
+                    self.show_register_form = false;
+                }
+            }
+        });
+
+        ui.add_space(10.0);
+        ui.separator();
+
+        // Si no está autenticado, mostrar formulario de login/registro
+        if !self.is_authenticated {
+            ui.add_space(10.0);
+            
+            if self.show_register_form {
+                // Formulario de Registro
+                ui.heading("📝 Crear Cuenta");
+                ui.add_space(10.0);
+
+                ui.horizontal(|ui| {
+                    ui.label("Email:");
+                    ui.text_edit_singleline(&mut self.register_email);
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label("Contraseña:");
+                    ui.add(egui::TextEdit::singleline(&mut self.register_password).password(true));
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label("Confirmar:");
+                    ui.add(egui::TextEdit::singleline(&mut self.register_confirm_password).password(true));
+                });
+
+                ui.add_space(10.0);
+
+                ui.horizontal(|ui| {
+                    if ui.button("✅ Registrarse").clicked() {
+                        self.handle_register();
+                    }
+
+                    if ui.button("← Volver al Login").clicked() {
+                        self.show_register_form = false;
+                    }
+                });
+
+            } else {
+                // Formulario de Login
+                ui.heading("🔐 Iniciar Sesión");
+                ui.add_space(10.0);
+
+                ui.horizontal(|ui| {
+                    ui.label("Email:");
+                    ui.text_edit_singleline(&mut self.login_email);
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label("Contraseña:");
+                    ui.add(egui::TextEdit::singleline(&mut self.login_password).password(true));
+                });
+
+                ui.add_space(10.0);
+
+                ui.horizontal(|ui| {
+                    if ui.button("🚀 Iniciar Sesión").clicked() {
+                        self.handle_login();
+                    }
+
+                    if ui.button("📝 Crear Cuenta").clicked() {
+                        self.show_register_form = true;
+                    }
+                });
+            }
+
+            // Mostrar mensaje de autenticación si existe
+            if let Some(msg) = &self.auth_message {
+                ui.add_space(10.0);
+                ui.colored_label(
+                    if msg.contains("✅") { egui::Color32::GREEN } else { egui::Color32::RED },
+                    msg
+                );
+            }
+
+            return; // No mostrar el resto si no está autenticado
+        }
+
+        // Panel de suscripción
+        ui.add_space(10.0);
+        ui.heading("💎 Planes de Suscripción");
+        ui.add_space(10.0);
+
+        ui.horizontal(|ui| {
+            self.render_tier_card(ui, SubscriptionTier::Free);
+            self.render_tier_card(ui, SubscriptionTier::Basic);
+            self.render_tier_card(ui, SubscriptionTier::Pro);
+            self.render_tier_card(ui, SubscriptionTier::Enterprise);
+        });
+
+        ui.add_space(20.0);
+        ui.separator();
+
+        // Chat con IA
+        ui.add_space(10.0);
+        ui.heading("💬 Chat con IA");
+        ui.add_space(10.0);
+
+        // Área de mensajes
+        egui::ScrollArea::vertical()
+            .id_source("ai_chat_scroll")
+            .max_height(300.0)
+            .stick_to_bottom(true)
+            .show(ui, |ui| {
+                for msg in &self.chat_messages {
+                    self.render_chat_message(ui, msg);
+                }
+
+                if self.ai_thinking {
+                    ui.horizontal(|ui| {
+                        ui.spinner();
+                        ui.label("IA pensando...");
+                    });
+                }
+            });
+
+        ui.add_space(10.0);
+
+        // Input de chat
+        ui.horizontal(|ui| {
+            let response = ui.add_sized(
+                [ui.available_width() - 80.0, 25.0],
+                egui::TextEdit::singleline(&mut self.chat_input)
+                    .hint_text("Escribe un mensaje para la IA...")
+            );
+
+            if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                self.send_chat_message();
+            }
+
+            if ui.button("🚀 Enviar").clicked() {
+                self.send_chat_message();
+            }
+        });
+
+        ui.add_space(5.0);
+        ui.label(format!("💳 {} créditos restantes", self.ai_credits));
+    }
+
+    fn render_tier_card(&mut self, ui: &mut egui::Ui, tier: SubscriptionTier) {
+        let (name, credits, price, color) = match tier {
+            SubscriptionTier::Free => ("Free", "100", "Gratis", egui::Color32::GRAY),
+            SubscriptionTier::Basic => ("Basic", "1,000", "$9.99/mes", egui::Color32::LIGHT_BLUE),
+            SubscriptionTier::Pro => ("Pro", "10,000", "$29.99/mes", egui::Color32::GOLD),
+            SubscriptionTier::Enterprise => ("Enterprise", "100,000", "$99.99/mes", egui::Color32::from_rgb(147, 51, 234)),
+        };
+
+        let is_current = self.user_tier == tier;
+
+        ui.group(|ui| {
+            ui.set_min_width(150.0);
+            ui.vertical(|ui| {
+                ui.colored_label(color, format!("⭐ {}", name));
+                ui.label(format!("💳 {} créditos", credits));
+                ui.label(price);
+                ui.add_space(5.0);
+
+                if is_current {
+                    ui.colored_label(egui::Color32::GREEN, "✅ Plan Actual");
+                } else if tier as u8 > self.user_tier.clone() as u8 {
+                    if ui.button("⬆️ Actualizar").clicked() {
+                        self.upgrade_tier(tier);
+                    }
+                }
+            });
+        });
+    }
+
+    fn render_chat_message(&self, ui: &mut egui::Ui, msg: &ChatMessage) {
+        ui.horizontal(|ui| {
+            let color = match msg.role {
+                MessageRole::User => egui::Color32::LIGHT_BLUE,
+                MessageRole::Assistant => egui::Color32::LIGHT_GREEN,
+                MessageRole::System => egui::Color32::YELLOW,
+            };
+
+            let icon = match msg.role {
+                MessageRole::User => "👤",
+                MessageRole::Assistant => "🤖",
+                MessageRole::System => "⚙️",
+            };
+
+            ui.colored_label(color, icon);
+            ui.vertical(|ui| {
+                ui.label(&msg.content);
+                ui.label(
+                    egui::RichText::new(&msg.timestamp)
+                        .size(10.0)
+                        .color(egui::Color32::GRAY)
+                );
+            });
+        });
+        ui.add_space(8.0);
+    }
+
+    fn send_chat_message(&mut self) {
+        if self.chat_input.trim().is_empty() {
+            return;
+        }
+
+        if self.ai_credits < 1 {
+            self.chat_messages.push(ChatMessage {
+                role: MessageRole::System,
+                content: "⚠️ Sin créditos. Actualiza tu plan para continuar.".to_string(),
+                timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
+            });
+            return;
+        }
+
+        // Mensaje del usuario
+        let user_message = self.chat_input.clone();
+        self.chat_messages.push(ChatMessage {
+            role: MessageRole::User,
+            content: user_message.clone(),
+            timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
+        });
+
+        self.chat_input.clear();
+        self.ai_thinking = true;
+
+        // Simular respuesta de IA (en producción, llamar API real)
+        let ai_response = self.get_ai_response(&user_message);
+
+        self.chat_messages.push(ChatMessage {
+            role: MessageRole::Assistant,
+            content: ai_response,
+            timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
+        });
+
+        self.ai_credits -= 1;
+        self.ai_thinking = false;
+    }
+
+    fn get_ai_response(&self, _user_message: &str) -> String {
+        "🤖 Respuesta de IA (mock). En producción, esto llamará a Gemini API.".to_string()
+    }
+
+    fn handle_login(&mut self) {
+        // Mock login (en producción, llamar API)
+        if !self.login_email.is_empty() && !self.login_password.is_empty() {
+            self.is_authenticated = true;
+            self.user_email = self.login_email.clone();
+            self.user_tier = SubscriptionTier::Free;
+            self.ai_credits = 100;
+            self.auth_message = Some("✅ Inicio de sesión exitoso".to_string());
+            self.login_password.clear();
+        } else {
+            self.auth_message = Some("❌ Email y contraseña requeridos".to_string());
+        }
+    }
+
+    fn handle_register(&mut self) {
+        // Mock register (en producción, llamar API)
+        if self.register_password != self.register_confirm_password {
+            self.auth_message = Some("❌ Las contraseñas no coinciden".to_string());
+            return;
+        }
+
+        if !self.register_email.is_empty() && self.register_password.len() >= 6 {
+            self.is_authenticated = true;
+            self.user_email = self.register_email.clone();
+            self.user_tier = SubscriptionTier::Free;
+            self.ai_credits = 100;
+            self.auth_message = Some("✅ Cuenta creada exitosamente".to_string());
+            self.register_password.clear();
+            self.register_confirm_password.clear();
+        } else {
+            self.auth_message = Some("❌ Email válido y contraseña de al menos 6 caracteres".to_string());
+        }
+    }
+
+    fn logout(&mut self) {
+        self.is_authenticated = false;
+        self.user_email = String::new();
+        self.user_tier = SubscriptionTier::Free;
+        self.ai_credits = 0;
+        self.chat_messages.clear();
+        self.login_email.clear();
+        self.login_password.clear();
+    }
+
+    fn upgrade_tier(&mut self, tier: SubscriptionTier) {
+        // Mock upgrade (en producción, integrar Stripe)
+        self.user_tier = tier.clone();
+        self.ai_credits = match tier {
+            SubscriptionTier::Free => 100,
+            SubscriptionTier::Basic => 1000,
+            SubscriptionTier::Pro => 10000,
+            SubscriptionTier::Enterprise => 100000,
+        };
+
+        self.chat_messages.push(ChatMessage {
+            role: MessageRole::System,
+            content: format!("✅ Plan actualizado a {:?}. {} créditos añadidos.", tier, self.ai_credits),
+            timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
+        });
+    }
+
     fn test_obs_connection(&mut self) {
         let config = self.config.clone();
         let runtime = Arc::clone(&self.runtime);
@@ -396,6 +766,7 @@ impl eframe::App for OBSAgentApp {
                 ui.selectable_value(&mut self.current_tab, Tab::Hardware, "🖥️  Hardware");
                 ui.selectable_value(&mut self.current_tab, Tab::Health, "🏥 Health");
                 ui.selectable_value(&mut self.current_tab, Tab::Anomalies, "🔍 Anomalías");
+                ui.selectable_value(&mut self.current_tab, Tab::AI, "🤖 IA & Servicios");
             });
         });
 
@@ -409,6 +780,7 @@ impl eframe::App for OBSAgentApp {
                     Tab::Hardware => self.render_hardware(ui),
                     Tab::Health => self.render_health(ui),
                     Tab::Anomalies => self.render_anomalies(ui),
+                    Tab::AI => self.render_ai(ui),
                 }
 
                 ui.add_space(20.0);
